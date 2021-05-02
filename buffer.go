@@ -36,6 +36,7 @@ func (p *BufferPool) evict() (BufferID, error) {
 		}
 
 		// 使用中でなければ
+		// TODO: goで参照カウント見るのわからないので一旦置いておく
 		if true {
 			frame.usageCount--
 			consecutivePinned = 0
