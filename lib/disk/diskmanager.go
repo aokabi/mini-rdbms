@@ -1,17 +1,15 @@
-package lib
+package disk
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/gob"
 	"io"
 	"math"
 	"os"
 )
 
 const (
-	invalidPageID = math.MaxUint64
-	pageSize      = 4096
+	InvalidPageID = math.MaxUint64
+	PageSize      = 4096
 )
 
 // Pageに関しては表記が面倒だからというだけで[pageSize]byteと別の型として扱わなくても良い気がする
@@ -20,7 +18,7 @@ const (
 // とりあえず上の話は忘れて，Pageはnodeのポインタにする
 // なぜならbyte配列だとnodeのデータと同期しないから
 // またまた変更でmetaもいれたいのでinterfaceにした
-type Page = interface{}
+type Page [PageSize]byte
 
 type PageID uint
 
@@ -28,7 +26,7 @@ func getPageID(b []byte) PageID {
 	return PageID(binary.BigEndian.Uint64(b))
 }
 
-func (i PageID) bytes() []byte {
+func (i PageID) Bytes() []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, uint64(i))
 	return b
@@ -42,7 +40,7 @@ type DiskManager struct {
 func newDisManager(dataFile os.File) *DiskManager {
 	info, _ := dataFile.Stat()
 	size := info.Size()
-	nextPageID := PageID(size / pageSize)
+	nextPageID := PageID(size / PageSize)
 	return &DiskManager{&dataFile, nextPageID}
 }
 
@@ -51,36 +49,28 @@ func Open(path string) *DiskManager {
 	return newDisManager(*heapFile)
 }
 
-func (d *DiskManager) allocatePage() PageID {
+func (d *DiskManager) AllocatePage() PageID {
 	pageID := d.nextPageID
 	d.nextPageID++
 	return PageID(pageID)
 }
 
-func (d *DiskManager) readPageData(pageID PageID) Page {
-	offset := int64(pageSize * pageID)
+func (d *DiskManager) ReadPageData(pageID PageID) Page {
+	offset := int64(PageSize * pageID)
 	d.heapFile.Seek(offset, io.SeekStart)
-	var data [pageSize]byte
+	var data [PageSize]byte
 	d.heapFile.Read(data[:])
-	reader := bytes.NewReader(data[:])
-	if pageID == 0 {
-		page := meta{}
-		gob.NewDecoder(reader).Decode(&page)
-		return &page
-	} else {
-		page := node{}
-		gob.NewDecoder(reader).Decode(&page)
-		return &page
-	}
+	// reader := bytes.NewReader(data[:])
+	return data
 }
 
-func (d *DiskManager) writePageData(pageID PageID, page Page) {
-	offset := int64(pageSize * pageID)
+func (d *DiskManager) WritePageData(pageID PageID, page Page) {
+	offset := int64(PageSize * pageID)
 	d.heapFile.Seek(offset, io.SeekStart)
-	buf := new(bytes.Buffer)
-	gob.NewEncoder(buf).Encode(page)
+	// buf := new(bytes.Buffer)
+	// gob.NewEncoder(buf).Encode(page)
 	// binary.Write(buf, binary.LittleEndian, *page)
-	var data [pageSize]byte
-	copy(data[:], buf.Bytes())
-	d.heapFile.Write(data[:])
+	// var data [PageSize]byte
+	// copy(data[:], buf.Bytes())
+	d.heapFile.Write(page[:])
 }

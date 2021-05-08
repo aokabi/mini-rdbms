@@ -1,13 +1,51 @@
-package lib
+package buffer
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"io"
+	"mini-rdbms/lib/disk"
+)
 
 type BufferID uint
+type PageID = disk.PageID
 
 type Buffer struct {
-	pageID  PageID
-	page    Page
+	PageID  PageID
+	page    disk.Page
+	ref     uint
 	isDirty bool
+}
+
+func (b *Buffer) SetPage(r io.Reader) error {
+	data := make([]byte, disk.PageSize)
+	n, err := r.Read(data)
+	if err != nil {
+		return err
+	}
+
+	if n > disk.PageSize {
+		return errors.New("over size")
+	}
+
+	copy(b.page[:], data)
+
+	return nil
+}
+
+// bufferにあるページからデータを読み出す
+func (b *Buffer) GetPage(w io.Writer) error {
+	_, err := w.Write(b.page[:])
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *Buffer) Close() {
+	// dereference
+	b.ref--
 }
 
 type Frame struct {
@@ -32,6 +70,7 @@ func NewBufferPool(poolSize uint) *BufferPool {
 func (p *BufferPool) useBuffer(bufferID BufferID) *Buffer {
 	frame := p.buffers[bufferID]
 	frame.usageCount++
+	frame.buffer.ref++
 	return frame.buffer
 }
 
@@ -46,14 +85,14 @@ func (p *BufferPool) evict() (BufferID, error) {
 
 		// 使用中でなければ
 		// TODO: goで参照カウント見るのわからないので一旦置いておく
-		if true {
+		if frame.buffer.ref == 0 {
 			frame.usageCount--
 			consecutivePinned = 0
 		} else { // 使用中なら
 			consecutivePinned++
 			// もしすべてのバッファが使用中なら
 			if consecutivePinned >= len(p.buffers) {
-				return 0, fmt.Errorf("No available buffers")
+				return 0, fmt.Errorf("no available buffers")
 			}
 		}
 	}
@@ -63,12 +102,12 @@ func (p *BufferPool) evict() (BufferID, error) {
 }
 
 type BufferPoolManager struct {
-	disk      DiskManager
+	disk      disk.DiskManager
 	pool      BufferPool
 	pageTable map[PageID]BufferID
 }
 
-func NewBufferPoolManager(disk *DiskManager, pool *BufferPool) *BufferPoolManager {
+func NewBufferPoolManager(disk *disk.DiskManager, pool *BufferPool) *BufferPoolManager {
 	return &BufferPoolManager{
 		disk:      *disk,
 		pool:      *pool,
@@ -76,29 +115,30 @@ func NewBufferPoolManager(disk *DiskManager, pool *BufferPool) *BufferPoolManage
 	}
 }
 
-func (m *BufferPoolManager) createPage() *Buffer {
-	pageID := m.disk.allocatePage()
+func (m *BufferPoolManager) CreatePage() *Buffer {
+	pageID := m.disk.AllocatePage()
 	// バッファに追加する
 	bufferID, err := m.pool.evict()
 	if err != nil {
 		fmt.Println(err)
 	}
 	frame := m.pool.buffers[bufferID]
-	frame.buffer.pageID = pageID
+	frame.buffer.PageID = pageID
 	frame.usageCount = 1
+	frame.buffer.ref = 1
 	fmt.Println("bufferID", bufferID)
 	m.pageTable[pageID] = bufferID
 	return frame.buffer
 }
 
-func (m *BufferPoolManager) fetchPage(pageID PageID) (*Buffer, error) {
+func (m *BufferPoolManager) FetchPage(pageID PageID) (*Buffer, error) {
 	// ページテーブルにpageIDのページがあるかどうか
 	if bufferID, ok := m.pageTable[pageID]; ok {
 		// あるならbufferIDのバッファを貸し出す
 		return m.pool.useBuffer(bufferID), nil
 	}
 
-	// ないなら
+	// ページテーブル上にないなら
 	// 払い出すバッファを決定する
 	bufferID, err := m.pool.evict()
 	if err != nil {
@@ -107,15 +147,17 @@ func (m *BufferPoolManager) fetchPage(pageID PageID) (*Buffer, error) {
 	// 払い出すバッファの中身が変更されていて，ディスクの内容が古くなっていたら，ディスクに書き出す
 	frame := m.pool.buffers[bufferID]
 	buffer := frame.buffer
-	evictPageID := buffer.pageID
+	evictPageID := buffer.PageID
 	if buffer.isDirty {
-		m.disk.writePageData(buffer.pageID, buffer.page)
+		m.disk.WritePageData(buffer.PageID, buffer.page)
 		buffer.isDirty = false
 	}
+
 	// バッファにページを読み出す
-	buffer.pageID = pageID
-	buffer.page = m.disk.readPageData(pageID)
+	buffer.PageID = pageID
+	buffer.page = m.disk.ReadPageData(pageID)
 	frame.usageCount = 1
+	buffer.ref = 1
 	// ページテーブルを更新する
 	delete(m.pageTable, evictPageID)
 	m.pageTable[pageID] = bufferID
@@ -128,7 +170,7 @@ func (m *BufferPoolManager) Flush() {
 	fmt.Println(m.pageTable)
 	for pageID, bufferID := range m.pageTable {
 		frame := m.pool.buffers[bufferID]
-		m.disk.writePageData(pageID, frame.buffer.page)
+		m.disk.WritePageData(pageID, frame.buffer.page)
 		frame.buffer.isDirty = false
 	}
 }

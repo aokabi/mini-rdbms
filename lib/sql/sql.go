@@ -1,21 +1,26 @@
-package lib
+package sql
+
+import (
+	"mini-rdbms/lib/btree"
+	"mini-rdbms/lib/buffer"
+)
 
 const encGroupSize = 8
 
 type simpleTable struct {
-	tree        *Btree
+	tree        *btree.Btree
 	numKeyElems uint
 }
 
 // 1テーブル1ツリー
 // 1ノード1ページ
 // 子ノードへの参照は子ノードのpageIDを保持
-func newSimpleTable(bufferPoolManager *BufferPoolManager, numKeyElems uint) *simpleTable {
-	btree := CreateBtree(bufferPoolManager)
+func newSimpleTable(bufferPoolManager *buffer.BufferPoolManager, numKeyElems uint) *simpleTable {
+	btree := btree.CreateBtree(bufferPoolManager)
 	return &simpleTable{btree, numKeyElems}
 }
 
-func (t *simpleTable) insert(bufferPoolManager *BufferPoolManager, record []byte) {
+func (t *simpleTable) insert(bufferPoolManager *buffer.BufferPoolManager, record []byte) {
 	// encode primary key
 	key := record[:t.numKeyElems]
 	encodedKey := encode(key)
@@ -43,4 +48,3 @@ func encode(elems []byte) []byte {
 	}
 	return result
 }
-

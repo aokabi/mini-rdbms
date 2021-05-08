@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
-	"main/lib"
+	"mini-rdbms/lib/btree"
+	"mini-rdbms/lib/buffer"
+	"mini-rdbms/lib/disk"
 )
 
 func main() {
 	// search all
 	{
-		disk := lib.Open("../../test.btr")
-		pool := lib.NewBufferPool(10)
-		bufferManager := lib.NewBufferPoolManager(disk, pool)
-
-		btree := lib.NewBtree(bufferManager, lib.PageID(0))
-
+		diskManager := disk.Open("../../test.btr")
+		pool := buffer.NewBufferPool(10)
+		bufferManager := buffer.NewBufferPoolManager(diskManager, pool)
+		btree := btree.NewBtree(bufferManager, disk.PageID(0))
+		fmt.Println("hoge")
 		// iter := btree.search(
 		// 	bufferManager,
 		// 	[]byte("Hyogo"),
