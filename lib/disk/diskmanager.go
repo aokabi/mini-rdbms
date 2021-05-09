@@ -23,12 +23,12 @@ type Page [PageSize]byte
 type PageID uint
 
 func getPageID(b []byte) PageID {
-	return PageID(binary.BigEndian.Uint64(b))
+	return PageID(binary.LittleEndian.Uint64(b))
 }
 
 func (i PageID) Bytes() []byte {
 	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(i))
+	binary.LittleEndian.PutUint64(b, uint64(i))
 	return b
 }
 
