@@ -29,6 +29,7 @@ func (b *Buffer) SetPage(r io.Reader) error {
 	}
 
 	copy(b.page[:], data)
+	b.isDirty = true
 
 	return nil
 }
@@ -61,7 +62,15 @@ type BufferPool struct {
 func NewBufferPool(poolSize uint) *BufferPool {
 	buffers := make([]Frame, poolSize)
 	for i := range buffers {
-		buffers[i] = Frame{0, &Buffer{}}
+		buffers[i] = Frame{
+			0,
+			&Buffer{
+				disk.InvalidPageID,
+				disk.Page{},
+				0,
+				false,
+			},
+		}
 	}
 
 	return &BufferPool{buffers: buffers}
@@ -122,16 +131,30 @@ func (m *BufferPoolManager) CreatePage() *Buffer {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	// 払い出すバッファの中身が変更されていて，ディスクの内容が古くなっていたら，ディスクに書き出す
 	frame := m.pool.buffers[bufferID]
+	buffer := frame.buffer
+	evictPageID := buffer.PageID
+	if buffer.isDirty {
+		m.disk.WritePageData(buffer.PageID, buffer.page)
+		buffer.isDirty = false
+	}
+	frame.buffer.page = [disk.PageSize]byte{}
 	frame.buffer.PageID = pageID
 	frame.usageCount = 1
 	frame.buffer.ref = 1
-	fmt.Println("bufferID", bufferID)
+
+	delete(m.pageTable, evictPageID)
 	m.pageTable[pageID] = bufferID
 	return frame.buffer
 }
 
 func (m *BufferPoolManager) FetchPage(pageID PageID) (*Buffer, error) {
+	if pageID == disk.InvalidPageID {
+		return nil, errors.New("invalid pageID")
+	}
+
 	// ページテーブルにpageIDのページがあるかどうか
 	if bufferID, ok := m.pageTable[pageID]; ok {
 		// あるならbufferIDのバッファを貸し出す
@@ -158,6 +181,7 @@ func (m *BufferPoolManager) FetchPage(pageID PageID) (*Buffer, error) {
 	buffer.page = m.disk.ReadPageData(pageID)
 	frame.usageCount = 1
 	buffer.ref = 1
+
 	// ページテーブルを更新する
 	delete(m.pageTable, evictPageID)
 	m.pageTable[pageID] = bufferID

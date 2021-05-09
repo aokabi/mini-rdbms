@@ -128,9 +128,7 @@ func (n *node) Write(src []byte) (int, error) {
 // return value
 func (n *node) search(bufManager *buffer.BufferPoolManager, key []byte) ([]byte, error) {
 	i, found := n.Items.find(key)
-	fmt.Println(i)
 	if found {
-		fmt.Println(string(n.Items[i].Value))
 		return n.Items[i].Value, nil
 	} else if len(n.Children) > 0 {
 		children, _ := bufManager.FetchPage(n.Children[i])
@@ -173,6 +171,33 @@ func (n *node) insert(bufferManager *buffer.BufferPoolManager, pageID PageID, it
 			}
 		}
 	}
+	return nil, disk.InvalidPageID
+}
+
+func (n *node) insertLoop(bufferManager *buffer.BufferPoolManager, pageID PageID, item Tuple, order uint) (*node, PageID) {
+	i, found := n.Items.find(item.Key)
+	currentNode := n
+	for len(currentNode.Children) != 0 {
+		buf, _ := bufferManager.FetchPage(currentNode.Children[i])
+		childNode := newNode()
+		defer func() {
+			buf.SetPage(childNode)
+			buf.Close()
+		}()
+		buf.GetPage(childNode)
+
+	}
+
+	// すでにあったらreplace
+	if found {
+		currentNode.Items[i] = item
+		return nil, disk.InvalidPageID
+	}
+	currentNode.Items.insertAt(i, item)
+	if len(currentNode.Items) > int(order-1) {
+		return currentNode.split(bufferManager, pageID, int(order/2))
+	}
+
 	return nil, disk.InvalidPageID
 }
 
@@ -236,7 +261,7 @@ func CreateBtree(bufManager *buffer.BufferPoolManager) *Btree {
 	meta.RootPageID = buffer.PageID
 	meta.FirstLeafPageID = buffer.PageID
 	return &Btree{
-		order:           4,
+		order:           8,
 		metaPageID:      metaBuffer.PageID,
 		firstLeafPageID: buffer.PageID,
 	}
@@ -299,15 +324,19 @@ func (b *Btree) SearchAll(bufManager *buffer.BufferPoolManager) (iter, error) {
 
 func (b *Btree) Insert(bufManager *buffer.BufferPoolManager, key []byte, value []byte) error {
 	// leaf nodeにたどり着くまで再帰的に
-	metaBuffer, _ := bufManager.FetchPage(b.metaPageID)
+	metaBuffer, err := bufManager.FetchPage(b.metaPageID)
+	if err != nil {
+		return fmt.Errorf("[%v], %w", key, err)
+	}
 	meta := newMeta()
 	metaBuffer.GetPage(meta)
-	rootBuffer, _ := bufManager.FetchPage(meta.RootPageID)
+	rootBuffer, err := bufManager.FetchPage(meta.RootPageID)
+	if err != nil {
+		return fmt.Errorf("[%v], %w", key, err)
+	}
 	root := newNode()
 	rootBuffer.GetPage(root)
-	fmt.Printf("%+v \n", root)
 	defer func() {
-		fmt.Println(meta.RootPageID)
 		metaBuffer.SetPage(meta)
 		metaBuffer.Close()
 		rootBuffer.SetPage(root)
@@ -321,13 +350,12 @@ func (b *Btree) Insert(bufManager *buffer.BufferPoolManager, key []byte, value [
 	// rootを分割
 	newRoot := newNode()
 	newRootBuffer := bufManager.CreatePage()
-	defer func () {
+	defer func() {
 		newRootBuffer.SetPage(newRoot)
 		newRootBuffer.Close()
 	}()
 	oldRootPageID := meta.RootPageID
 	meta.RootPageID = newRootBuffer.PageID
-	fmt.Println("dou", meta.RootPageID)
 	newRoot.Children = append(newRoot.Children, oldRootPageID, newPageID)
 	newRoot.Items = append(newRoot.Items, Tuple{node.Items[0].Key, newPageID.Bytes()})
 
