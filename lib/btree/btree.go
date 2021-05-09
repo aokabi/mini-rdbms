@@ -242,7 +242,7 @@ func (n *node) split(bufferManager *buffer.BufferPoolManager, pageID PageID, i i
 
 type Btree struct {
 	order           uint // 最大で持てる子供の数
-	metaPageID      PageID
+	MetaPageID      PageID
 	firstLeafPageID PageID
 }
 
@@ -261,8 +261,8 @@ func CreateBtree(bufManager *buffer.BufferPoolManager) *Btree {
 	meta.RootPageID = buffer.PageID
 	meta.FirstLeafPageID = buffer.PageID
 	return &Btree{
-		order:           8,
-		metaPageID:      metaBuffer.PageID,
+		order:           4,
+		MetaPageID:      metaBuffer.PageID,
 		firstLeafPageID: buffer.PageID,
 	}
 }
@@ -301,7 +301,7 @@ func (b *Btree) String() string {
 // return value
 func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) ([]byte, error) {
 	// get root node
-	metaBuffer, _ := bufManager.FetchPage(b.metaPageID)
+	metaBuffer, _ := bufManager.FetchPage(b.MetaPageID)
 	meta := newMeta()
 	metaBuffer.GetPage(meta)
 	rootBuffer, _ := bufManager.FetchPage(meta.RootPageID)
@@ -324,7 +324,7 @@ func (b *Btree) SearchAll(bufManager *buffer.BufferPoolManager) (iter, error) {
 
 func (b *Btree) Insert(bufManager *buffer.BufferPoolManager, key []byte, value []byte) error {
 	// leaf nodeにたどり着くまで再帰的に
-	metaBuffer, err := bufManager.FetchPage(b.metaPageID)
+	metaBuffer, err := bufManager.FetchPage(b.MetaPageID)
 	if err != nil {
 		return fmt.Errorf("[%v], %w", key, err)
 	}

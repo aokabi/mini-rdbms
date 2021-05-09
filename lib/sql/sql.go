@@ -1,33 +1,53 @@
 package sql
 
 import (
+	"fmt"
 	"mini-rdbms/lib/btree"
 	"mini-rdbms/lib/buffer"
+	"mini-rdbms/lib/disk"
 )
 
 const encGroupSize = 8
 
 type simpleTable struct {
-	tree        *btree.Btree
+	metaPageID  disk.PageID
 	numKeyElems uint
+}
+
+// schema定義
+func NewSimpleTable(numKeyElems uint) *simpleTable {
+	return &simpleTable{disk.InvalidPageID, numKeyElems}
 }
 
 // 1テーブル1ツリー
 // 1ノード1ページ
 // 子ノードへの参照は子ノードのpageIDを保持
-func newSimpleTable(bufferPoolManager *buffer.BufferPoolManager, numKeyElems uint) *simpleTable {
+func (t *simpleTable) Create(bufferPoolManager *buffer.BufferPoolManager) {
 	btree := btree.CreateBtree(bufferPoolManager)
-	return &simpleTable{btree, numKeyElems}
+	t.metaPageID = btree.MetaPageID
 }
 
-func (t *simpleTable) insert(bufferPoolManager *buffer.BufferPoolManager, record []byte) {
+func (t *simpleTable) Insert(bufferPoolManager *buffer.BufferPoolManager, record [][]byte) {
+	tree := btree.NewBtree(bufferPoolManager, t.metaPageID)
+	fmt.Println(tree.MetaPageID)
 	// encode primary key
 	key := record[:t.numKeyElems]
-	encodedKey := encode(key)
+	encodedKey := encodeElems(key)
 	// encode value
 	value := record[t.numKeyElems:]
-	encodedValue := encode(value)
-	t.tree.Insert(bufferPoolManager, encodedKey, encodedValue)
+	encodedValue := encodeElems(value)
+	err := tree.Insert(bufferPoolManager, encodedKey, encodedValue)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func encodeElems(elems [][]byte) []byte {
+	result := make([]byte, 0)
+	for _, elem := range elems {
+		result = append(result, encode(elem)...)
+	}
+	return result
 }
 
 func encode(elems []byte) []byte {
