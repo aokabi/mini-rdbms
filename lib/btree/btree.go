@@ -291,7 +291,7 @@ func NewBtree(bufManager *buffer.BufferPoolManager, metaPageID PageID) *Btree {
 	}()
 
 	fmt.Println("new btree", root)
-	return &Btree{4, rootPage.PageID, meta.FirstLeafPageID}
+	return &Btree{4, metaPage.PageID, meta.FirstLeafPageID}
 }
 
 func (b *Btree) String() string {
