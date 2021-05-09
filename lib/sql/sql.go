@@ -32,37 +32,37 @@ func (t *simpleTable) Insert(bufferPoolManager *buffer.BufferPoolManager, record
 	fmt.Println(tree.MetaPageID)
 	// encode primary key
 	key := record[:t.numKeyElems]
-	encodedKey := encodeElems(key)
+	encodedKey := EncodeElems(key)
 	// encode value
 	value := record[t.numKeyElems:]
-	encodedValue := encodeElems(value)
+	encodedValue := EncodeElems(value)
 	err := tree.Insert(bufferPoolManager, encodedKey, encodedValue)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func encodeElems(elems [][]byte) []byte {
+func EncodeElems(elems [][]byte) []byte {
 	result := make([]byte, 0)
 	for _, elem := range elems {
-		result = append(result, encode(elem)...)
+		result = append(result, Encode(elem)...)
 	}
 	return result
 }
 
-func encode(elems []byte) []byte {
-	result := make([]byte, 0, (len(elems)/8+1)*(encGroupSize+1))
-	for i := 0; i < len(elems); i += encGroupSize {
+func Encode(elem []byte) []byte {
+	result := make([]byte, 0, (len(elem)/8+1)*(encGroupSize+1))
+	for i := 0; i < len(elem); i += encGroupSize {
 		// 末尾なら
-		if encGroupSize >= len(elems)-i {
-			validLen := len(elems[i:])
+		if encGroupSize >= len(elem)-i {
+			validLen := len(elem[i:])
 			padding := make([]byte, encGroupSize-validLen)
-			result = append(result, elems[i:]...)
+			result = append(result, elem[i:]...)
 			result = append(result, padding...)
 			result = append(result, byte(validLen))
 		} else {
 			// 末尾じゃないなら9を入れる
-			result = append(result, elems[i:i+encGroupSize]...)
+			result = append(result, elem[i:i+encGroupSize]...)
 			result = append(result, 9)
 		}
 	}
