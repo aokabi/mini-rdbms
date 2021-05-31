@@ -126,16 +126,19 @@ func (n *node) Write(src []byte) (int, error) {
 }
 
 // return value
-func (n *node) search(bufManager *buffer.BufferPoolManager, key []byte) ([]byte, error) {
+func (n *node) search(bufManager *buffer.BufferPoolManager, pageID PageID, key []byte) (*iter, error) {
 	i, found := n.Items.find(key)
 	if found {
-		return n.Items[i].Value, nil
+		return newIter(pageID, i), nil
 	} else if len(n.Children) > 0 {
 		children, _ := bufManager.FetchPage(n.Children[i])
 		childNode := newNode()
-		defer children.SetPage(childNode)
+		defer func() {
+			children.SetPage(childNode)
+			children.Close()
+		}()
 		children.GetPage(childNode)
-		return childNode.search(bufManager, key)
+		return childNode.search(bufManager, children.PageID, key)
 	}
 	return nil, errors.New("not found")
 }
@@ -299,7 +302,7 @@ func (b *Btree) String() string {
 }
 
 // return value
-func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) ([]byte, error) {
+func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) (*iter, error) {
 	// get root node
 	metaBuffer, _ := bufManager.FetchPage(b.MetaPageID)
 	meta := newMeta()
@@ -315,7 +318,7 @@ func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) ([]byte
 		rootBuffer.Close()
 	}()
 
-	return root.search(bufManager, key)
+	return root.search(bufManager, rootBuffer.PageID, key)
 }
 
 func (b *Btree) SearchAll(bufManager *buffer.BufferPoolManager) (iter, error) {
@@ -371,6 +374,10 @@ type iter struct {
 	pageID  PageID
 	idx     int // node内の要素の位置
 	hasNext bool
+}
+
+func newIter(pageID PageID, idx int) *iter {
+	return &iter{pageID: pageID, idx: idx, hasNext: true}
 }
 
 func (i *iter) HasNext() bool {
