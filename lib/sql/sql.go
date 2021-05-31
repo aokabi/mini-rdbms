@@ -68,3 +68,28 @@ func Encode(elem []byte) []byte {
 	}
 	return result
 }
+
+func DecodeElems(elems []byte) [][]byte {
+	start := 0
+	result := make([][]byte, 0)
+	for i := 8; i < len(elems); i += encGroupSize + 1 {
+		if elems[i] != byte(9) {
+			result = append(result, Decode(elems[start:i+1]))
+			start = i+1
+		}
+	}
+	return result
+}
+
+func Decode(elem []byte) []byte {
+	result := make([]byte, 0)
+	for i := 0; i < len(elem); i += encGroupSize + 1 {
+		// 末尾
+		if lastBlockSize := int(elem[i+encGroupSize]); lastBlockSize != 9 {
+			result = append(result, elem[i:i+lastBlockSize]...)
+		} else {
+			result = append(result, elem[i:i+encGroupSize]...)
+		}
+	}
+	return result
+}
