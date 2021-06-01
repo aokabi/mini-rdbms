@@ -126,7 +126,7 @@ func (n *node) Write(src []byte) (int, error) {
 }
 
 // return value
-func (n *node) search(bufManager *buffer.BufferPoolManager, pageID PageID, key []byte) (*iter, error) {
+func (n *node) search(bufManager *buffer.BufferPoolManager, pageID PageID, key []byte) (*Iter, error) {
 	i, found := n.Items.find(key)
 	if found {
 		return newIter(pageID, i), nil
@@ -302,7 +302,7 @@ func (b *Btree) String() string {
 }
 
 // return value
-func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) (*iter, error) {
+func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) (*Iter, error) {
 	// get root node
 	metaBuffer, _ := bufManager.FetchPage(b.MetaPageID)
 	meta := newMeta()
@@ -321,8 +321,8 @@ func (b *Btree) Search(bufManager *buffer.BufferPoolManager, key []byte) (*iter,
 	return root.search(bufManager, rootBuffer.PageID, key)
 }
 
-func (b *Btree) SearchAll(bufManager *buffer.BufferPoolManager) (iter, error) {
-	return iter{b.firstLeafPageID, 0, true}, nil
+func (b *Btree) SearchAll(bufManager *buffer.BufferPoolManager) (*Iter, error) {
+	return &Iter{b.firstLeafPageID, 0, true}, nil
 }
 
 func (b *Btree) Insert(bufManager *buffer.BufferPoolManager, key []byte, value []byte) error {
@@ -370,21 +370,21 @@ type Tuple struct {
 	Value []byte
 }
 
-type iter struct {
+type Iter struct {
 	pageID  PageID
 	idx     int // node内の要素の位置
 	hasNext bool
 }
 
-func newIter(pageID PageID, idx int) *iter {
-	return &iter{pageID: pageID, idx: idx, hasNext: true}
+func newIter(pageID PageID, idx int) *Iter {
+	return &Iter{pageID: pageID, idx: idx, hasNext: true}
 }
 
-func (i *iter) HasNext() bool {
+func (i *Iter) HasNext() bool {
 	return i.hasNext
 }
 
-func (i *iter) Next(bufManager *buffer.BufferPoolManager) *Tuple {
+func (i *Iter) Next(bufManager *buffer.BufferPoolManager) *Tuple {
 	// get element
 	leafBuffer, _ := bufManager.FetchPage(i.pageID)
 	leafNode := newNode()
@@ -416,7 +416,7 @@ func (i *iter) Next(bufManager *buffer.BufferPoolManager) *Tuple {
 
 type tuples struct {
 	items    []*Tuple
-	iterator *iter
+	iterator *Iter
 }
 
 func (t *tuples) HasNext() bool {
