@@ -10,7 +10,7 @@ import (
 func main() {
 	// search all
 	{
-		diskManager := disk.Open("../../test.btr")
+		diskManager := disk.Open("../simple-table-create/simple.rly")
 		pool := buffer.NewBufferPool(10)
 		bufferManager := buffer.NewBufferPoolManager(diskManager, pool)
 		btree := btree.NewBtree(bufferManager, disk.PageID(0))

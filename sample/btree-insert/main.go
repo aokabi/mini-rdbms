@@ -11,22 +11,26 @@ type PageID uint
 
 func main() {
 	// insert data to BTree
-	diskManager := disk.Open("../../test.btr")
+	diskManager := disk.Open("test.btr")
 	pool := buffer.NewBufferPool(10)
 	bufferManager := buffer.NewBufferPoolManager(diskManager, pool)
 
-	btree := btree.CreateBtree(bufferManager)
+	t := btree.CreateBtree(bufferManager)
 
-	btree.Insert(bufferManager, []byte("Kanagawa"), []byte("Yokohama"))
-	btree.Insert(bufferManager, []byte("Osaka"), []byte("Osaka"))
-	btree.Insert(bufferManager, []byte("Aichi"), []byte("Nagoya"))
-	btree.Insert(bufferManager, []byte("Hokkaido"), []byte("Sapporo"))
-	btree.Insert(bufferManager, []byte("Fukuoka"), []byte("Fukuoka"))
-	fmt.Printf("%+v", btree)
-	btree.Insert(bufferManager, []byte("Hyogo"), []byte("Kobe"))
-	btree.Insert(bufferManager, []byte("Aomori"), []byte("Aomori"))
+	err := t.Insert(bufferManager, []byte("Kanagawa"), []byte("Yokohama"))
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Printf("%+v", btree)
+	t.Insert(bufferManager, []byte("Osaka"), []byte("Osaka"))
+	t.Insert(bufferManager, []byte("Aichi"), []byte("Nagoya"))
+	t.Insert(bufferManager, []byte("Hokkaido"), []byte("Sapporo"))
+	t.Insert(bufferManager, []byte("Fukuoka"), []byte("Fukuoka"))
+	fmt.Printf("%+v", t)
+	t.Insert(bufferManager, []byte("Hyogo"), []byte("Kobe"))
+	t.Insert(bufferManager, []byte("Aomori"), []byte("Aomori"))
+
+	fmt.Printf("%+v", t)
 	// fmt.Println(len(btree.root.children))
 	bufferManager.Flush()
 
