@@ -6,7 +6,6 @@ import (
 	"mini-rdbms/lib/buffer"
 	"mini-rdbms/lib/disk"
 
-	"github.com/sqs/goreturns/returns"
 )
 
 const encGroupSize = 8
