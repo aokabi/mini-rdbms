@@ -5,18 +5,30 @@ import (
 	"mini-rdbms/lib/btree"
 	"mini-rdbms/lib/buffer"
 	"mini-rdbms/lib/disk"
+
+	"github.com/sqs/goreturns/returns"
 )
 
 const encGroupSize = 8
 
 type simpleTable struct {
-	metaPageID  disk.PageID
+	metaPageID  disk.PageID // 初期化時にInvalidPageIDを入れる
 	numKeyElems uint
+}
+
+type table struct {
+	metaPageID  disk.PageID // 初期化時にInvalidPageIDを入れる
+	numKeyElems uint
+	uniqueIndices []uniqueIndex
 }
 
 // schema定義
 func NewSimpleTable(numKeyElems uint) *simpleTable {
 	return &simpleTable{disk.InvalidPageID, numKeyElems}
+}
+
+func NewTable(numKeyElems uint, uniqueIndices []uniqueIndex) *table {
+	return &table{disk.InvalidPageID, numKeyElems, uniqueIndices}
 }
 
 // 1テーブル1ツリー
@@ -25,6 +37,16 @@ func NewSimpleTable(numKeyElems uint) *simpleTable {
 func (t *simpleTable) Create(bufferPoolManager *buffer.BufferPoolManager) {
 	btree := btree.CreateBtree(bufferPoolManager)
 	t.metaPageID = btree.MetaPageID
+}
+
+func (t *table) Create(bufferPoolManager *buffer.BufferPoolManager) {
+	btree := btree.CreateBtree(bufferPoolManager)
+	t.metaPageID = btree.MetaPageID
+
+	// create secondary index
+	for _, v := range t.uniqueIndices {
+		v.Create(bufferPoolManager)
+	}
 }
 
 func (t *simpleTable) Insert(bufferPoolManager *buffer.BufferPoolManager, record [][]byte) {
@@ -41,6 +63,51 @@ func (t *simpleTable) Insert(bufferPoolManager *buffer.BufferPoolManager, record
 		panic(err)
 	}
 }
+
+func (t *table) Insert(bufferPoolManager *buffer.BufferPoolManager, record [][]byte) {
+	tree := btree.NewBtree(bufferPoolManager, t.metaPageID)
+	// encode primary key
+	key := record[:t.numKeyElems]
+	encodedKey := EncodeElems(key)
+	// encode value
+	value := record[t.numKeyElems:]
+	encodedValue := EncodeElems(value)
+	err := tree.Insert(bufferPoolManager, encodedKey, encodedValue)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, v := range t.uniqueIndices {
+		v.Insert(bufferPoolManager, record)
+	}
+}
+
+type uniqueIndex struct {
+	metaPageID disk.PageID
+	skey []uint // key columns
+}
+
+func NewUniqueIndex(skey ...uint) *uniqueIndex {
+	return &uniqueIndex{skey: skey}
+}
+ 
+func (idx *uniqueIndex) Create(bufferPoolManager *buffer.BufferPoolManager) {
+	btree := btree.CreateBtree(bufferPoolManager)
+	idx.metaPageID = btree.MetaPageID
+}
+
+func (idx *uniqueIndex) Insert(bufferPoolManager *buffer.BufferPoolManager, record[][]byte) {
+	btree := btree.NewBtree(bufferPoolManager, idx.metaPageID)
+	pkeyEncoded := Encode(record[0])
+	skey := make([][]byte, 0)
+	for _, v := range idx.skey {
+		skey = append(skey, record[int(v)])
+	}
+	skeyEncoded := EncodeElems(skey)
+	btree.Insert(bufferPoolManager, skeyEncoded, pkeyEncoded)
+}
+
+// Encode/Decode tuple
 
 func EncodeElems(elems [][]byte) []byte {
 	result := make([]byte, 0)
