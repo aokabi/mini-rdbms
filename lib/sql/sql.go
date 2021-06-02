@@ -18,7 +18,7 @@ type simpleTable struct {
 type table struct {
 	metaPageID  disk.PageID // 初期化時にInvalidPageIDを入れる
 	numKeyElems uint
-	uniqueIndices []uniqueIndex
+	uniqueIndices []*uniqueIndex
 }
 
 // schema定義
@@ -26,8 +26,12 @@ func NewSimpleTable(numKeyElems uint) *simpleTable {
 	return &simpleTable{disk.InvalidPageID, numKeyElems}
 }
 
-func NewTable(numKeyElems uint, uniqueIndices []uniqueIndex) *table {
-	return &table{disk.InvalidPageID, numKeyElems, uniqueIndices}
+func NewTable(numKeyElems uint, uniqueIndices [][]uint) *table {
+	indices := make([]*uniqueIndex, 0, len(uniqueIndices))
+	for _, v := range uniqueIndices {
+		indices = append(indices, &uniqueIndex{disk.InvalidPageID, v})
+	}
+	return &table{disk.InvalidPageID, numKeyElems, indices}
 }
 
 // 1テーブル1ツリー
@@ -97,7 +101,7 @@ func (idx *uniqueIndex) Create(bufferPoolManager *buffer.BufferPoolManager) {
 
 func (idx *uniqueIndex) Insert(bufferPoolManager *buffer.BufferPoolManager, record[][]byte) {
 	btree := btree.NewBtree(bufferPoolManager, idx.metaPageID)
-	pkeyEncoded := Encode(record[0])
+	pkeyEncoded := EncodeElems(record[0:1])
 	skey := make([][]byte, 0)
 	for _, v := range idx.skey {
 		skey = append(skey, record[int(v)])

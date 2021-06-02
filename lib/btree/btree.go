@@ -128,9 +128,12 @@ func (n *node) Write(src []byte) (int, error) {
 // return value
 func (n *node) search(bufManager *buffer.BufferPoolManager, pageID PageID, key []byte) (*Iter, error) {
 	i, found := n.Items.find(key)
-	if found {
+	if len(n.Children) == 0 && found {
 		return newIter(pageID, i), nil
 	} else if len(n.Children) > 0 {
+		if found {
+			i +=1
+		}
 		children, _ := bufManager.FetchPage(n.Children[i])
 		childNode := newNode()
 		defer func() {
