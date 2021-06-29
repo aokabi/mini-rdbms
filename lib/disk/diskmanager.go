@@ -27,7 +27,7 @@ func getPageID(b []byte) PageID {
 }
 
 func (i PageID) Bytes() []byte {
-	b := make([]byte, 8)
+	b := make([]byte, 8) // これなんで8byteにしたんだ???
 	binary.LittleEndian.PutUint64(b, uint64(i))
 	return b
 }
