@@ -75,7 +75,7 @@ func (n *meta) Write(src []byte) (int, error) {
 	}
 	n.FirstLeafPageID = meta.FirstLeafPageID
 	n.RootPageID = meta.RootPageID
-	return buffer.Len(), nil
+	return len(src) - buffer.Len(), nil
 }
 
 // gobでbyteと変換するためフィールドはpublic
@@ -122,7 +122,7 @@ func (n *node) Write(src []byte) (int, error) {
 	n.Items = node.Items
 	n.NextLeaf = node.NextLeaf
 	n.PrevLeaf = node.PrevLeaf
-	return buffer.Len(), nil
+	return len(src) - buffer.Len(), nil
 }
 
 // return value
