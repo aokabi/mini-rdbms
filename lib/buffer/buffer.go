@@ -12,9 +12,9 @@ type PageID = disk.PageID
 
 type Buffer struct {
 	PageID  PageID
-	page    disk.Page
-	ref     uint
-	isDirty bool
+	page    disk.Page // data
+	ref     uint // 参照カウント
+	isDirty bool // pageが更新されていて，disk上のデータと異なっているときtrue
 }
 
 func (b *Buffer) SetPage(r io.Reader) error {
