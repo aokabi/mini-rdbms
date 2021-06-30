@@ -47,7 +47,7 @@ func Test_meta_Read(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("meta.Read() = %v, want %v", got, tt.want)
 			}
-			if !reflect.DeepEqual(tt.args.dst[:buffer.Len()-1], buffer.Bytes()) {
+			if !reflect.DeepEqual(tt.args.dst[:buffer.Len()], buffer.Bytes()) {
 				t.Errorf("meta.Read() = %v, want %v", tt.args.dst[:buffer.Len()], buffer.Bytes())
 			}
 		})
